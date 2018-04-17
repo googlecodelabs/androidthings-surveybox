@@ -1,0 +1,5 @@
+**/.firebaserc
+**/npm-debug.log
+**/firebase-debug.log
+**/build
+**/.idea
