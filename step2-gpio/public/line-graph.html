@@ -1,0 +1,159 @@
+<!--
+@license
+Copyright 2018, Google, Inc.
+Licensed under the Apache License, Version 2.0 (the 'License');
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+    http://www.apache.org/licenses/LICENSE-2.0
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an 'AS IS' BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+<link rel="import" href="bower_components/polymer/polymer.html">
+<link rel="import" href="bower_components/polymer/polymer-element.html">
+<script src="bower_components/webcomponentsjs/webcomponents-lite.js"></script>
+
+<link rel="stylesheet" href="src/cool_styles.css">
+
+<dom-module id="line-graph">
+    <template>
+        <style>
+        </style>
+
+        <!-- Main content -->
+        <div class='canvas-container'>
+            <canvas id="lineGraph"></canvas>
+        </div>
+
+    </template>
+
+    <script>
+        const KEY_BUTTON_VALUE = 'value';
+        const KEY_TIMESTAMP = 'servertime';
+
+        const LABEL_SAD = "😔 Sad";
+        const LABEL_UNHAPPY = "☹️ Unhappy";
+        const LABEL_HAPPY = "🙂 Happy";
+        const LABEL_GRIN = "😄 Grin";
+
+        const COLOR_SAD = 'rgba(244,67,54,1)'; // Red-ish
+        const COLOR_UNHAPPY = 'rgba(3,169,244,1)'; // Blue-ish
+        const COLOR_HAPPY = 'rgba(255,193,7,1)'; // Yellow-ish
+        const COLOR_GRIN = 'rgba(76,175,80,1)'; // Green-ish
+        const COLOR_INVISIBLE = 'rgba(0,0,0,0)';
+
+        let lineGraph;
+
+        class LineGraph extends Polymer.Element {
+            static get is() { return 'line-graph' }
+
+            static get properties() {
+                return {
+                    data: {
+                        type: Array,
+                        observer: 'onGraphChanged'
+                    }
+                }
+            }
+
+            connectedCallback() {
+                super.connectedCallback();
+                window.requestAnimationFrame(() => {
+                    this.initializeGraphs();
+                });
+            }
+
+            initializeGraphs() {
+                const ctxTimeCount = this.$["lineGraph"].getContext('2d');
+                lineGraph = new Chart(ctxTimeCount, {
+                    type: 'line',
+                    data: {
+                        labels: [],
+                        datasets: [{
+                            label: LABEL_SAD,
+                            data: [], borderColor: [COLOR_SAD], backgroundColor: [COLOR_INVISIBLE], lineTension: 0.2
+                        }, {
+                            label: LABEL_UNHAPPY,
+                            data: [], borderColor: [COLOR_UNHAPPY], backgroundColor: [COLOR_INVISIBLE], lineTension: 0.2
+                        }, {
+                            label: LABEL_HAPPY,
+                            data: [], borderColor: [COLOR_HAPPY], backgroundColor: [COLOR_INVISIBLE], lineTension: 0.2
+                        }],
+                    },
+                    options: {
+                        scales: {
+                            xAxes: [{
+                                type: "category",
+                                position: "bottom"
+                            }],
+                            yAxes: [{
+                                ticks: {
+                                    min: 0,
+                                    suggestedMax: 4
+                                }
+                            }]
+                        },
+                        animation: {
+                            duration: 300, // general animation time
+                        },
+                        hover: {
+                            animationDuration: 100, // duration of animations when hovering an item
+                        },
+                        responsiveAnimationDuration: 0, // animation duration after a resize
+                    }
+                });
+            }
+
+            getDateFormattedLabel(timestamp) {
+                if (typeof timestamp == "string") {
+                    timestamp = parseInt(timestamp);
+                }
+                let date = new Date(timestamp);
+                return (date.getHours()) + ":" + ((date.getMinutes() < 10) ? "0" : "") + date.getMinutes();
+            }
+
+            getTimestampFuzzy(time) {
+                // Round down to 1 minute blocks
+                return Math.floor(time / 1000 / 60 / 1) * 1000 * 60 * 1;
+            }
+
+            onGraphChanged(newValue, oldValue) {
+                if (lineGraph && lineGraph.data && newValue) {
+                    const dataset = [[], [], [], []];
+                    if (newValue.indexSplices) {
+                        // Obtain our dataset from our splice
+                        newValue = newValue.indexSplices[0].object;
+                    }
+                    const labels = [];
+                    let timestampCache = 0;
+                    let timestampIndex = -1;
+                    for (const index in newValue) {
+                        const datum = newValue[index];
+                        let rating = datum[KEY_BUTTON_VALUE];
+                        let timestamp = this.getTimestampFuzzy(datum[KEY_TIMESTAMP]);
+                        if (timestampCache != timestamp) {
+                            timestampCache = timestamp;
+                            timestampIndex++;
+                            // Increment
+                            labels.push(this.getDateFormattedLabel(timestamp));
+                            dataset[0][timestampIndex] = { x: timestampIndex, y: 0 };
+                            dataset[1][timestampIndex] = { x: timestampIndex, y: 0 };
+                            dataset[2][timestampIndex] = { x: timestampIndex, y: 0 };
+                        }
+                        dataset[rating][timestampIndex] =
+                            { x: timestampIndex, y: (dataset[rating][timestampIndex].y + 1 || 1) };
+                    }
+                    lineGraph.config.data.labels = labels;
+                    lineGraph.data.datasets[0].data = dataset[0];
+                    lineGraph.data.datasets[1].data = dataset[1];
+                    lineGraph.data.datasets[2].data = dataset[2];
+                    lineGraph.update();
+                }
+            }
+        }
+
+        customElements.define(LineGraph.is, LineGraph);
+    </script>
+</dom-module>

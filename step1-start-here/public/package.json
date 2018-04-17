@@ -1,0 +1,19 @@
+{
+  "name": "Surveybox",
+  "version": "0.0.1",
+  "description": "Surveybox",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "start-dev": "polymer serve",
+    "start": "polymer build && cd build/bundled && hs",
+    "deploy": "polymer build && find build/bundled -type d | xargs chmod a+rx && find build/bundled -type f | xargs chmod a+r && rsync -avl build/bundled/* smart-home-provider.com:src/1216.4/device/",
+    "test": "polymer test"
+  },
+  "devDependencies": {
+    "bower": "^1.8.4"
+  },
+  "author": "",
+  "license": "ISC"
+}

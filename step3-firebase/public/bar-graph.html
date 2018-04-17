@@ -1,0 +1,134 @@
+<!--
+@license
+Copyright 2018, Google, Inc.
+Licensed under the Apache License, Version 2.0 (the 'License');
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+    http://www.apache.org/licenses/LICENSE-2.0
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an 'AS IS' BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+<link rel="import" href="bower_components/polymer/polymer.html">
+<link rel="import" href="bower_components/polymer/polymer-element.html">
+<script src="bower_components/webcomponentsjs/webcomponents-lite.js"></script>
+
+<link rel="stylesheet" href="src/cool_styles.css">
+
+<dom-module id="bar-graph">
+    <template>
+        <style>
+        </style>
+
+        <!-- Main content -->
+        <div class='canvas-container'>
+            <canvas id="bargraph"></canvas>
+        </div>
+
+    </template>
+
+    <script>
+        let barGraph;
+
+        class BarGraph extends Polymer.Element {
+            static get is() { return 'bar-graph' }
+
+            static get properties() {
+                return {
+                    data: {
+                        type: Array,
+                        observer: 'onGraphChanged'
+                    }
+                }
+            }
+
+            connectedCallback() {
+                super.connectedCallback();
+                window.requestAnimationFrame(() => {
+                    this.initializeGraphs();
+                });
+            }
+
+            initializeGraphs() {
+                const ctxBar = this.$["bargraph"].getContext('2d');
+                barGraph = new Chart(ctxBar, {
+                    type: 'bar',
+                    data: {
+                        labels: [LABEL_SAD, LABEL_UNHAPPY, LABEL_HAPPY],
+                        datasets: [{
+                            label: '# of Ratings',
+                            data: [],
+                            backgroundColor: [
+                                COLOR_SAD,
+                                COLOR_UNHAPPY,
+                                COLOR_HAPPY,
+                            ],
+                            borderColor: [
+                                'rgba(255,99,132,1)',
+                                'rgba(54, 162, 235, 1)',
+                                'rgba(255, 206, 86, 1)',
+                            ],
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        scales: {
+                            yAxes: [{
+                                ticks: {
+                                    beginAtZero: true
+                                }
+                            }]
+                        },
+                        animation: {
+                            duration: 300, // general animation time
+                        },
+                        hover: {
+                            animationDuration: 100, // duration of animations when hovering an item
+                        },
+                        responsiveAnimationDuration: 0, // animation duration after a resize
+                        tooltips: {
+                            callbacks: {
+                                label: function (tooltipItem, data) {
+                                    //get the concerned dataset
+                                    var dataset = data.datasets[tooltipItem.datasetIndex];
+                                    //calculate the total of this data set
+                                    var total = dataset.data.reduce(function (previousValue, currentValue, currentIndex, array) {
+                                        return previousValue + currentValue;
+                                    });
+                                    //get the current items value
+                                    var currentValue = dataset.data[tooltipItem.index];
+                                    //calculate the precentage based on the total and current item, also this does a rough rounding to give a whole number
+                                    var precentage = Math.floor(((currentValue / total) * 100) + 0.5);
+
+                                    return ` ${currentValue}  (${precentage}%)`;
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+
+            onGraphChanged(newValue, oldValue) {
+                if (barGraph && barGraph.data && newValue) {
+                    const dataset = [0, 0, 0];
+                    if (newValue.indexSplices) {
+                        // Obtain our dataset from our splice
+                        newValue = newValue.indexSplices[0].object;
+                    }
+                    for (const index in newValue) {
+                        const datum = newValue[index];
+                        let rating = datum[KEY_BUTTON_VALUE];
+                        let timestamp = datum[KEY_TIMESTAMP];
+                        dataset[rating]++; // Ratings on a score of 0 - 2
+                    }
+                    barGraph.data.datasets[0].data = dataset;
+                    barGraph.update();
+                }
+            }
+        }
+
+        customElements.define(BarGraph.is, BarGraph);
+    </script>
+</dom-module>
