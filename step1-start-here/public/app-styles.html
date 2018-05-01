@@ -1,0 +1,191 @@
+<!--
+@license
+Copyright 2018, Google, Inc.
+Licensed under the Apache License, Version 2.0 (the 'License');
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+    http://www.apache.org/licenses/LICENSE-2.0
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an 'AS IS' BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+
+<link rel="import" href="bower_components/polymer/polymer.html">
+
+<!-- shared styles for all views -->
+<dom-module id="app-styles">
+    <template>
+        <style>
+            html,
+            body {
+                margin: 0;
+                font-family: 'Roboto', 'Noto', sans-serif;
+                -webkit-font-smoothing: antialiased;
+                background: #f1f1f1;
+                max-height: 368px;
+            }
+
+            app-toolbar {
+                background-color: #4285f4;
+                color: #fff;
+            }
+
+            paper-icon-button {
+                --paper-icon-button-ink-color: white;
+            }
+
+            paper-icon-button.edit {
+                --paper-icon-button-ink-color: #333;
+                height: 20px;
+                padding: 4px;
+                width: 20px;
+                margin-left: 16px;
+            }
+
+            paper-icon-button+[main-title] {
+                margin-left: 24px;
+            }
+
+            paper-progress {
+                display: block;
+                width: 100%;
+                --paper-progress-active-color: rgba(255, 255, 255, 0.5);
+                --paper-progress-container-color: transparent;
+            }
+
+            app-header {
+                @apply --layout-fixed-top;
+                color: #fff;
+                --app-header-background-rear-layer: {
+                    background-color: #ef6c00;
+                }
+                ;
+            }
+
+            app-drawer {
+                /* --app-drawer-scrim-background: rgba(0, 0, 100, 0.8); */
+                --app-drawer-content-container: {
+                    /* background-color: #B0BEC5; */
+                }
+                z-index: 9999;
+                /*   :|   */
+            }
+
+            app-drawer h1 {
+                font-size: 16pt;
+                font-weight: 100;
+                margin-left: 8px;
+            }
+
+            app-drawer ul {
+                list-style-type: none;
+            }
+
+            app-drawer paper-button {
+                cursor: pointer;
+                font-weight: bold;
+                text-transform: none;
+                margin: 0;
+                padding: 0;
+            }
+
+            app-drawer sub {
+                display: block;
+                margin-left: 20px;
+                opacity: 0.6;
+                cursor: initial;
+                font-weight: normal;
+            }
+
+            app-drawer .add-new paper-button {
+                font-weight: bold;
+                margin-top: 16px;
+                text-transform: uppercase;
+                cursor: pointer;
+            }
+
+            paper-tabs {
+                font-family: 'Roboto', 'Noto', sans-serif;
+                -webkit-font-smoothing: antialiased;
+                width: 100%;
+                text-transform: uppercase;
+                margin-bottom: 1px;
+            }
+
+            paper-tab.day-tab {
+                --paper-tab-ink: #09f;
+                color: #09f;
+            }
+
+            paper-tab.day-tab.iron-selected {
+                font-weight: bold;
+                border: solid 1px blue;
+                padding-left: 8px;
+                padding-right: 8px;
+                height: 30px;
+            }
+
+            paper-tab.session-tab,
+            paper-tab.room-tab {
+                --paper-tab-ink: #555;
+                color: #555;
+                border-bottom: solid 1px #555;
+                padding-left: 0px;
+                padding-right: 0px;
+                height: 30px;
+                margin-left: 20px;
+            }
+
+            paper-tab.session-tab.iron-selected,
+            paper-tab.room-tab.iron-selected {
+                font-weight: bold;
+                border: solid 1px #555;
+                padding-left: 8px;
+                padding-right: 8px;
+                height: 30px;
+            }
+
+            paper-tab.session-tab sub,
+            paper-tab.room-tab sub {
+                font-size: 8px;
+                opacity: 0.6;
+                display: block;
+                margin-left: 4px;
+            }
+
+            paper-progress {
+                --paper-progress-active-color: #e91e63;
+                --paper-progress-indeterminate-cycle-duration: 3.3s;
+            }
+
+            .content {
+                margin-top: 72px;
+                margin-left: 40px;
+                font-family: 'Roboto', 'Noto', sans-serif;
+            }
+
+            .content h1 {
+                margin-left: 40px;
+                display: inline-block;
+                border-bottom: solid 1px black;
+                text-transform: uppercase;
+                font-weight: 100;
+                margin-bottom: 4px;
+            }
+
+            .content h2 {
+                margin-left: 40px;
+                color: #555;
+                font-weight: 100;
+                text-transform: uppercase;
+            }
+
+            .content img {
+                margin-top: 20px;
+                margin-left: 40px;
+            }
+        </style>
+    </template>
+</dom-module>

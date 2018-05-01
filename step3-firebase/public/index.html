@@ -121,8 +121,6 @@ limitations under the License.
         // Track the UID of the current user.
         var currentUid = null;
         firebase.auth().onAuthStateChanged(function (user) {
-            console.log(user);
-
             // onAuthStateChanged listener triggers every time the user ID token changes.
             // This could happen when a new user signs in or signs out.
             // It could also happen when the current user ID token expires and is refreshed.

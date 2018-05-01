@@ -1,0 +1,643 @@
+<!--
+@license
+Copyright 2018, Google, Inc.
+Licensed under the Apache License, Version 2.0 (the 'License');
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+    http://www.apache.org/licenses/LICENSE-2.0
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an 'AS IS' BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+<link rel="import" href="bower_components/polymer/polymer.html">
+<link rel="import" href="bower_components/polymer/polymer-element.html">
+<link rel="import" href="bower_components/app-layout/app-header/app-header.html">
+<link rel="import" href="bower_components/app-layout/app-layout.html">
+<link rel="import" href="bower_components/app-layout/app-scroll-effects/app-scroll-effects.html">
+<link rel="import" href="bower_components/app-layout/app-toolbar/app-toolbar.html">
+<link rel="import" href="bower_components/iron-icons/iron-icons.html">
+<link rel="import" href="bower_components/iron-icons/editor-icons.html">
+<link rel="import" href="bower_components/iron-icons/places-icons.html">
+<link rel="import" href="bower_components/iron-list/iron-list.html">
+<link rel="import" href="bower_components/paper-button/paper-button.html">
+<link rel="import" href="bower_components/paper-dialog/paper-dialog.html">
+<link rel="import" href="bower_components/paper-icon-button/paper-icon-button.html">
+<link rel="import" href="bower_components/paper-tabs/paper-tabs.html">
+<link rel="import" href="bower_components/paper-toast/paper-toast.html">
+<link rel="import" href="bower_components/paper-progress/paper-progress.html">
+<link rel="import" href="bower_components/paper-item/paper-item.html">
+<link rel="import" href="bower_components/paper-dropdown-menu/paper-dropdown-menu.html">
+<link rel="import" href="bower_components/paper-listbox/paper-listbox.html">
+<script src="bower_components/webcomponentsjs/webcomponents-bundle.js"></script>
+
+<link rel="import" href="bar-graph.html">
+<link rel="import" href="line-graph.html">
+<link rel="stylesheet" href="src/styles.css">
+
+<dom-module id="app-scaffolding">
+    <template></template>
+
+    <script>
+        const MODE_SESSION_VIEW = 0;
+        const MODE_DEVICE_EDITOR = 1;
+        const MODE_SESSION_EDITOR = 2;
+
+        const MS_IN_DAY = 24 * 60 * 60 * 1000;
+        const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+        const hourInMs = (hour) => 3600000 * hour;
+
+        class AppScaffolding extends Polymer.Element {
+            static get is() { return 'my-app' }
+
+            static get properties() {
+                return {
+                    devices: {
+                        type: Array,
+                        value: []
+                    },
+                    events: {
+                        type: Array,
+                        value: []
+                    },
+                    currentEventKey: {
+                        type: String,
+                        value: 'default',
+                        observer: 'onEventChanged'
+                    },
+                    currentEvent: {
+                        type: Object,
+                        value: {
+                            days: [],
+                            name: "Default"
+                        }
+                    },
+                    currentLimitStart: {
+                        type: Number,
+                        value: 0
+                    },
+                    currentLimitEnd: {
+                        type: Number,
+                        value: 0
+                    },
+                    currentLimitRoom: {
+                        type: String,
+                        value: undefined
+                    },
+                    currentDay: {
+                        type: Number,
+                        value: 0
+                    },
+                    currentRooms: {
+                        type: Array,
+                        value: []
+                    },
+                    currentSessions: {
+                        type: Array,
+                        value: []
+                    },
+                    graphData: {
+                        type: Object,
+                        value: {
+                            count: 404,
+                            data: []
+                        }
+                    },
+                    deviceEditor: {
+                        type: Object,
+                        value: {
+                            deviceId: '1234',
+                            currentSession: 'default'
+                        }
+                    },
+                    eventEditor: {
+                        type: Object,
+                        value: {
+                            eventId: '',
+                            currentEvent: {
+                                startTime: 0,
+                                endTime: 0
+                            }
+                        }
+                    },
+                    appMode: {
+                        type: Number,
+                        value: 0,
+                        observer: 'onAppModeChanged'
+                    },
+                    sessionView: {
+                        type: Boolean,
+                        value: true
+                    },
+                    deviceEditorView: {
+                        type: Boolean,
+                        value: false
+                    },
+                    sessionEditorView: {
+                        type: Boolean,
+                        value: false
+                    }
+                }
+            }
+
+            static get observers() {
+                return [
+                    // Observer method name, followed by a list of dependencies, in parenthesis
+                    'onGraphChanged(graphData.data)', // Check direct changes
+                    'onGraphChanged(graphData.data.splices)', // Check array mutations
+                    'onEventEditorEventStartChanged(eventEditor.currentEvent.startTime)',
+                    'onEventEditorEventEndChanged(eventEditor.currentEvent.endTime)'
+                ]
+            }
+
+            qc(id) {
+                return this.shadowRoot.querySelector(`#${id}`);
+            }
+
+            connectedCallback() {
+                super.connectedCallback();
+                window.requestAnimationFrame(() => {
+                    this.readFirebase();
+                });
+            }
+
+            // https://stackoverflow.com/questions/31388072/polymer-1-0-dom-repeat-display-index-starting-at-1
+            displayIndex(index) {
+                return index + 1;
+            }
+
+            readFirebase() {
+                this.set('events', []);
+                let eventData = firebase.database().ref(`events`);
+                eventData.once('value').then((snapshot) => {
+                    console.info("Pinged Firebase");
+                    const eventObj = snapshot.val();
+                    if (eventObj) {
+                        for (const key in eventObj) {
+                            const event = eventObj[key];
+                            this.push('events', {
+                                key: key,
+                                name: event.name,
+                                start: this.parseTimestamp(event.start),
+                                end: this.parseTimestamp(event.end),
+                                startTime: parseInt(event.start),
+                                endTime: parseInt(event.end),
+                                rooms: event.rooms,
+                                sessions: event.sessions,
+                                timeZone: event.timeZone || 0
+                            })
+                        }
+                    }
+                }).then(() => {
+                    this.set('devices', []);
+                    let deviceData = firebase.database().ref(`devices`);
+                    return deviceData.once('value')
+                }).then((snapshot) => {
+                    console.info("Pinged Firebase");
+                    const eventObj = snapshot.val();
+                    if (eventObj) {
+                        for (const key in eventObj) {
+                            const device = eventObj[key];
+                            let deviceEvent;
+                            for (const index in this.events) {
+                                // Replace event key with event label
+                                const event = this.events[index];
+                                if (event.key == device.current_event) {
+                                    deviceEvent = event.name;
+                                }
+                            }
+                            this.push('devices', {
+                                key: key,
+                                name: device.name,
+                                event: deviceEvent,
+                                eventKey: device.current_event,
+                                room: device.current_room
+                            });
+                        }
+                    }
+                }).then(() => {
+                    this.onEventChanged(window.location.hash.substr(1), "");
+                })
+            }
+
+            onAppModeChanged(newValue, oldValue) {
+                this.sessionView = newValue == MODE_SESSION_VIEW;
+                this.deviceEditorView = newValue == MODE_DEVICE_EDITOR;
+                this.sessionEditorView = newValue == MODE_SESSION_EDITOR;
+            }
+
+            onDeviceNew(event) {
+                const key = event.path[0].dataset.key;
+                const value = event.path[0].value;
+                const eventData = firebase.database().ref(`devices`);
+                const newDeviceKey = eventData.push().key;
+                let updates = {};
+                updates[`${newDeviceKey}/current_event`] = '';
+                updates[`${newDeviceKey}/current_room`] = '';
+                updates[`${newDeviceKey}/name`] = 'New Device';
+                eventData.update(updates);
+                // Update DOM.
+                this.push(`devices`, { key: newDeviceKey, name: 'New Device', event: '', eventKey: '' });
+            }
+
+            onEventNew(event) {
+                const key = event.path[0].dataset.key;
+                const value = event.path[0].value;
+                const eventData = firebase.database().ref(`events`);
+                const newEventKey = eventData.push().key;
+                let updates = {};
+                updates[`${newEventKey}/start`] = 0;
+                updates[`${newEventKey}/end`] = 0;
+                updates[`${newEventKey}/timeZone`] = 0;
+                updates[`${newEventKey}/name`] = 'New Event';
+                updates[`${newEventKey}/rooms`] = [];
+                updates[`${newEventKey}/sessions`] = [];
+                eventData.update(updates);
+                // Update DOM.
+                this.push(`events`, {
+                    key: newEventKey, name: 'New Event', start: 'New', end: 'New',
+                    startTime: 0, endTime: 1, rooms: [], sessions: [], timeZone: 0
+                });
+            }
+
+            onDeviceSelected(event) {
+                const deviceId = event.path[0].dataset.deviceid;
+                this.set('deviceEditor', {
+                    deviceId: deviceId,
+                    deviceName: this.devices.filter(i => {
+                        return i.key == deviceId
+                    })[0].name,
+                    currentSession: this.devices.filter(i => {
+                        return i.key == deviceId
+                    })[0].eventKey,
+                    currentRoomKey: this.devices.filter(i => {
+                        return i.key == deviceId
+                    })[0].room,
+                    eventLabel: this.devices.filter(i => {
+                        return i.key == deviceId
+                    })[0].event
+                });
+                const rooms = this.events.filter(i => {
+                    return i.key == this.deviceEditor.currentSession
+                })[0].rooms;
+                if (rooms) {
+                    this.set('deviceEditor.currentRooms', Object.entries(rooms).map(i => {
+                        return { key: i[0], value: i[1] }
+                    }));
+                    // this.set('deviceEditor.currentRoomKey', Object.entries(rooms).filter(i=>{
+                    //     return i[0] == this.deviceEditor.currentRoomKey
+                    // }))[0][0];
+                    console.log(Object.entries(rooms).filter(i => {
+                        return i[0] == this.deviceEditor.currentRoomKey
+                    }));
+                    this.set('deviceEditor.currentRoomLabel', Object.entries(rooms).filter(i => {
+                        return i[0] == this.deviceEditor.currentRoomKey
+                    })[0][1]);
+                }
+                this.set('appMode', MODE_DEVICE_EDITOR);
+                this.$['drawer'].close();
+            }
+
+            onDeviceEditorNameChanged(event) {
+                const key = event.path[0].dataset.key;
+                const value = event.path[0].value;
+                const deviceData = firebase.database().ref(`devices/${this.deviceEditor.deviceId}`);
+                deviceData.update({
+                    name: value
+                });
+            }
+
+            onDeviceEditorEventChanged(event) {
+                const key = event.path[0].dataset.key;
+                const deviceData = firebase.database().ref(`devices/${this.deviceEditor.deviceId}`);
+                deviceData.update({
+                    current_event: key
+                });
+                const rooms = this.events.filter(i => {
+                    return i.key == key
+                })[0].rooms;
+                if (rooms) {
+                    this.set('deviceEditor.currentRooms', Object.entries(rooms).map(i => {
+                        return { key: i[0], value: i[1] }
+                    }));
+                    this.set('deviceEditor.currentRoomKey', Object.entries(rooms).filter(i => {
+                        return i[0] == this.deviceEditor.currentRoomKey
+                    })[0][0]);
+                    this.set('deviceEditor.currentRoomLabel', Object.entries(rooms).filter(i => {
+                        return i[0] == this.deviceEditor.currentRoomKey
+                    })[0][1]);
+                }
+            }
+
+            onDeviceEditorRoomChanged(event) {
+                const key = event.path[0].dataset.key;
+                const deviceData = firebase.database().ref(`devices/${this.deviceEditor.deviceId}`);
+                deviceData.update({
+                    current_room: key
+                });
+            }
+
+            onEventSelected(event) {
+                // You click the icon. We may need to go up event stack to the button.
+                const eventId = event.path[0].dataset.eventid || event.path[2].dataset.eventid;
+                const roomsO = this.events.filter(i => {
+                    return i.key == eventId
+                })[0].rooms;
+                const rooms = Object.entries(roomsO).map(i => {
+                    return { key: i[0], value: i[1] }
+                });
+                const sessionsO = this.events.filter(i => {
+                    return i.key == eventId
+                })[0].sessions;
+                const sessions = Object.entries(sessionsO).map(i => {
+                    // Get the room label as the default for the dropdown
+                    const roomLabel = rooms.filter(j => { return j.key == i[1].roomId })[0].value
+                    return { key: i[0], value: i[1], roomLabel: roomLabel }
+                });
+                this.set('eventEditor', {
+                    eventId: eventId,
+                    rooms: rooms,
+                    sessions: sessions,
+                    currentEvent: this.events.filter(i => {
+                        return i.key == eventId
+                    })[0]
+                });
+                this.set('appMode', MODE_SESSION_EDITOR);
+                this.$['drawer'].close();
+            }
+
+            onEventEditorEventNameChanged(event) {
+                const key = this.eventEditor.eventId;
+                const value = event.path[0].value;
+                const eventData = firebase.database().ref(`events`);
+                let updates = {};
+                updates[`${key}/name`] = value;
+                eventData.update(updates);
+            }
+
+            onEventEditorEventStartChanged(event) {
+                const key = this.eventEditor.eventId;
+                console.log(key, event);
+                if (key.length == 0) return;
+                const value = event;
+                const eventData = firebase.database().ref(`events`);
+                let updates = {};
+                updates[`${key}/start`] = value;
+                eventData.update(updates);
+            }
+
+            onEventEditorEventEndChanged(event) {
+                const key = this.eventEditor.eventId;
+                if (key.length == 0) return;
+                const value = event;
+                const eventData = firebase.database().ref(`events`);
+                let updates = {};
+                updates[`${key}/end`] = value;
+                eventData.update(updates);
+            }
+
+            onEventEditorEventTimeZoneChanged(event) {
+                const key = this.eventEditor.eventId;
+                const value = event.path[0].value;
+                const eventData = firebase.database().ref(`events`);
+                let updates = {};
+                updates[`${key}/timeZone`] = value;
+                eventData.update(updates);
+            }
+
+            onEventEditorRoomNew(event) {
+                const key = event.path[0].dataset.key;
+                const value = event.path[0].value;
+                const eventData = firebase.database().ref(`events/${this.eventEditor.eventId}/rooms`);
+                const newRoomKey = eventData.push().key;
+                let updates = {};
+                updates[newRoomKey] = '';
+                // Update DOM.
+                this.push('eventEditor.rooms', { key: newRoomKey, value: '' });
+                eventData.update(updates);
+            }
+
+            onEventEditorRoomNameChanged(event) {
+                const key = event.path[0].dataset.key;
+                const value = event.path[0].value;
+                const eventData = firebase.database().ref(`events/${this.eventEditor.eventId}/rooms`);
+                let updates = {};
+                updates[key] = value;
+                eventData.update(updates);
+            }
+
+            onEventEditorSessionNew(event) {
+                const key = event.path[0].dataset.key;
+                const value = event.path[0].value;
+                const eventData = firebase.database().ref(`events/${this.eventEditor.eventId}/sessions`);
+                const newSessionKey = eventData.push().key;
+                let updates = {};
+                updates[`${newSessionKey}/end`] = 0;
+                updates[`${newSessionKey}/start`] = 0;
+                updates[`${newSessionKey}/label`] = '';
+                updates[`${newSessionKey}/roomId`] = '';
+                // Update DOM.
+                this.push(`eventEditor.sessions`, { key: newSessionKey, value: { end: 0, start: 0, label: '', roomId: '' } });
+                eventData.update(updates);
+            }
+
+            onEventEditorSessionNameChanged(event) {
+                const key = event.path[0].dataset.key;
+                const value = event.path[0].value;
+                const eventData = firebase.database().ref(`events/${this.eventEditor.eventId}/sessions`);
+                let updates = {};
+                updates[`${key}/label`] = value;
+                eventData.update(updates);
+            }
+
+            onEventEditorSessionRoomChanged(event) {
+                const key = event.path[0].dataset.key;
+                const sessionkey = event.path[0].dataset.sessionkey;
+                const value = event.path[0].value;
+                const eventData = firebase.database().ref(`events/${this.eventEditor.eventId}/sessions`);
+                let updates = {};
+                updates[`${sessionkey}/roomId`] = key;
+                eventData.update(updates);
+            }
+
+            onEventEditorSessionStartChanged(event) {
+                if (!event.path[2].dataset) return;
+                const key = event.path[2].dataset.key;
+                const value = event.path[0].valueAsNumber - hourInMs(parseInt(this.eventEditor.currentEvent.timeZone));
+                const eventData = firebase.database().ref(`events/${this.eventEditor.eventId}/sessions`);
+                let updates = {};
+                updates[`${key}/start`] = value;
+                eventData.update(updates);
+            }
+
+            onEventEditorSessionEndChanged(event) {
+                if (!event.path[2].dataset) return;
+                const key = event.path[2].dataset.key;
+                const value = event.path[0].valueAsNumber - hourInMs(parseInt(this.eventEditor.currentEvent.timeZone));
+                const eventData = firebase.database().ref(`events/${this.eventEditor.eventId}/sessions`);
+                let updates = {};
+                updates[`${key}/end`] = value;
+                eventData.update(updates);
+            }
+
+            onEventButton(event) {
+                // Read id of element selected in the event path
+                const newEventKey = event.path[0].dataset.id;
+                this.set('currentEventKey', newEventKey);
+                this.$['drawer'].close();
+            }
+
+            onEventChanged(newValue, oldValue) {
+                this.set('appMode', MODE_SESSION_VIEW);
+                this.$.progress.indeterminate = true;
+                window.location.hash = newValue;
+                window.requestAnimationFrame(() => {
+                    this.qc('day-tabs').selected = 0;
+                    // Obtain current event data
+                    for (const index in this.events) {
+                        // Replace event key with event label
+                        const event = this.events[index];
+                        if (event.key == newValue) {
+                            this.currentEventKey = event.key;
+                            this.set('currentEvent.days', []);
+                            this.set('currentEvent.name', event.name);
+                            this.set('currentEvent.timeZone', parseInt(event.timeZone));
+                            this.set('currentLimitStart', event.startTime);
+                            this.set('currentLimitEnd', event.endTime);
+                            if (event.rooms) {
+                                this.set('currentRooms', Object.entries(event.rooms).map(a => {
+                                    return { "key": a[0], "name": a[1] }
+                                }));
+                            } else {
+                                this.set('currentRooms', []);
+                            }
+                            this.set('currentSessions', event.sessions);
+                            for (let i = parseInt(event.startTime) + hourInMs(parseInt(event.timeZone));
+                                i <= parseInt(event.endTime) + hourInMs(parseInt(event.timeZone));
+                                i += MS_IN_DAY) {
+                                // Get every day
+                                this.push('currentEvent.days', {
+                                    label: DOW[new Date(i).getDay()],
+                                    date: i
+                                });
+                            }
+                        }
+                    }
+                    this.onDay();
+
+                    // Read data
+                    let pressRef = firebase.database().ref(`data/${newValue}`);
+                    this.set('graphData.count', 0);
+                    this.set('graphData.data', []);
+                    pressRef.on('child_added', (snapshot) => {
+                        this.$.progress.indeterminate = true;
+                        let buttonPress = snapshot.val();
+                        this.set('graphData.count', this.graphData.count + 1);
+                        this.push('graphData.data', buttonPress);
+                        window.requestAnimationFrame(() => {
+                            this.onSession();
+                        });
+                        this.$.progress.indeterminate = false;
+                    });
+                });
+            }
+
+            onGraphChanged(newValue, oldValue) {
+                window.requestAnimationFrame(() => {
+                    this.qc('bar-graph').set('data', newValue);
+                    this.qc('line-graph').set('data', newValue);
+                });
+            }
+
+            onDay(element) {
+                window.requestAnimationFrame(() => {
+                    const currentSelectionIndex = this.qc('day-tabs').selected;
+                    console.log("Switch to day index", currentSelectionIndex);
+                    this.set('currentDay', currentSelectionIndex);
+                    this.set('currentLimitStart', 0);
+                    this.set('currentLimitEnd', new Date().getTime() + MS_IN_DAY);
+                    this.set('currentEvent.currentDay.dayIndex', currentSelectionIndex);
+                    this.qc('room-tabs').selected = 0;
+                    this.qc('session-tabs').selected = 0;
+                    this.onRoom();
+                });
+            }
+
+            onRoom(element) {
+                window.requestAnimationFrame(() => {
+                    const currentSelectionIndex = this.qc('room-tabs').selected - 1; // 'All' doesn't count.
+                    if (currentSelectionIndex == -1) {
+                        this.set('currentLimitRoom', undefined);
+                    } else {
+                        this.set('currentLimitRoom', this.currentRooms[currentSelectionIndex]);
+                        console.log("Switch to room id", currentSelectionIndex);
+                    }
+                    this.qc('session-tabs').selected = 0;
+                    this.set('currentSessionsFiltered', Object.entries(this.currentSessions || {}).map(obj => {
+                        return {
+                            key: obj[0],
+                            end: obj[1].end,
+                            name: obj[1].label,
+                            start: obj[1].start,
+                            roomId: obj[1].roomId
+                        };
+                    }).filter(obj => {
+                        return !this.currentLimitRoom || obj.roomId === this.currentLimitRoom.key;
+                    }).filter(obj => {
+                        return obj.start >= this.currentEvent.days[this.currentDay].date &&
+                            obj.end < this.currentEvent.days[this.currentDay].date + MS_IN_DAY;
+                    }));
+                    this.onSession();
+                });
+            }
+
+            onSession(element) {
+                window.requestAnimationFrame(() => {
+                    const currentSelectionIndex = this.qc('session-tabs').selected - 1; // 'All' doesn't count.
+                    this.set('currentLimitStart', 0);
+                    this.set('currentLimitEnd', new Date().getTime() + MS_IN_DAY);
+
+                    const filteredData = this.graphData.data.filter(datum => {
+                        return datum.servertime >= this.currentLimitStart &&
+                            datum.servertime < this.currentLimitEnd
+                    }).filter(datum => {
+                        return !this.currentLimitRoom || datum.roomId == this.currentLimitRoom.key;
+                    });
+
+                    this.set('graphData.count', filteredData.length);
+                    this.qc('bar-graph').set('data', filteredData);
+                    this.qc('line-graph').set('data', filteredData);
+                });
+            }
+
+            parseTimestamp(timestamp) {
+                if (typeof timestamp == "string") {
+                    timestamp = parseInt(timestamp);
+                }
+                let date = new Date(timestamp);
+                return (date.getMonth() + 1) + "/" + date.getDate();
+            }
+
+            getFormattedLabel(timestamp) {
+                if (typeof timestamp == "string") {
+                    timestamp = parseInt(timestamp);
+                }
+                let date = new Date(timestamp);
+                return (date.getHours()) + ":" + ((date.getMinutes() < 10) ? "0" : "") + date.getMinutes();
+            }
+
+            getDateFormattedLabel(timestamp) {
+                if (typeof timestamp == "string") {
+                    timestamp = parseInt(timestamp);
+                }
+                let date = new Date(timestamp);
+                return (date.getMonth() + 1) + '/' + date.getDate() + ' ' +
+                    (date.getHours()) + ":" + ((date.getMinutes() < 10) ? "0" : "") + date.getMinutes();
+            }
+        }
+
+        customElements.define(AppScaffolding.is, AppScaffolding);
+    </script>
+</dom-module>
