@@ -35,7 +35,7 @@ android {
 }
 
 ext {
-    googlePlayServices = "11.8.0"
+    googlePlayServices = "15.0.0"
 }
 
 dependencies {
