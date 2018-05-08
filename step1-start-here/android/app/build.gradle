@@ -50,5 +50,3 @@ dependencies {
     implementation "com.google.firebase:firebase-database:$googlePlayServices"
     implementation "com.google.firebase:firebase-auth:$googlePlayServices"
 }
-
-apply plugin: 'com.google.gms.google-services'
